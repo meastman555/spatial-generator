@@ -16,6 +16,7 @@ public class RoomGenerator : MonoBehaviour
 
     [Header("Starting Parameters")]
     [SerializeField] private GameObject startingRoom;
+    //if you want to do the middle, it's not (0,0) it's (width/2, height/2)
     [SerializeField] private int startingXCoord;
     [SerializeField] private int startingYCoord;
 
@@ -42,32 +43,68 @@ public class RoomGenerator : MonoBehaviour
 
     //recursively picks and places rooms in a depth-first manner
     //general rules:
-    //if the next placed room would be outside the defined layout size, that is ok, just place a room with ONLY the complementary opening (no additional branches) and thus end recursion on that path
-    //if the next placed room would be in a spot that already has a room (multiple shared openings that create a loop), don't place anything and move on (end recursion)
-    //if this iteration would exceed the specified recursion depth, don't do anything
+    //-- if the next placed room would be outside the defined layout size, that is ok, just place a room with ONLY the complementary opening (no additional branches) and thus end recursion on that path
+    //-- if the next placed room would be in a spot that already has a room (multiple shared openings that create a loop), don't place anything and move on (end recursion)
+    //-- if this iteration would exceed the specified recursion depth, don't do anything
+    //the way the indecies and bounds are set up, there should never be an out of bound error on the array, but I'm not using assert statements nor proofs so this is more anecdoatal. find a way to guarantee?
 
-    //TODO: something is being a little wonky with the room placement, and I think I'm hitting grid edges too quickly?
-    //there is a problem with reuse of spaces, so need to double check the boolean stuff is working as intended (rooms are overwriting existing ones incorrectly)
-    //added in branch end rooms, but it appears that some openings are left opened -- check bounds to make sure they're correct?
+    //TODO: few things
+    //--> sometimes the first room (specified as just U) will regenerate on top of itself at the very end. not sure why, doens't seem to be negatively affecting things, but look in to
+    //--> rooms are still generating on top of each other in some cases. not sure why, but need to fix
+    //--> a few blocks, in that rooms with openings don't lead to another room correctly, hits the wall. i think this is caused by the branch generation of another set of rooms not communicating with others, leading to linear paths that block each other off
+    //-----> maybe each room checks more of its surroundings before deciding which to place?
     void recursivelyGenerateNextRoom(int currentDepth, GameObject currentRoom, int currentXPos, int currentYPos) {
-
-        //depth check
-        if(currentDepth > recursionDepth) {
-            return;
-        }
-
         RoomData roomData = currentRoom.GetComponent<RoomData>();
 
+        Debug.Log("room type: " + currentRoom.name);
         Debug.Log("number of openings on the room: " + roomData.numOpenings);
+
+        //depth check, make sure all the openings of the current room are closed and end branching
+        if(currentDepth > recursionDepth) {
+            //for now, manually check each opening like recursive cases
+            if(roomData.upOpening && !rooms[currentXPos, currentYPos - 1]) {
+                rooms[currentXPos, currentYPos - 1] = true;
+                Vector3 endRoomPos = currentRoom.transform.position;
+                endRoomPos.y += yOffset;
+                //don't think I need to save reference to this since I'm not using it
+                GameObject instantiatedEndRoom = Instantiate(upBranchEndRoom, endRoomPos, Quaternion.identity);
+            }
+            if(roomData.leftOpening && !rooms[currentXPos - 1, currentYPos]) {
+                rooms[currentXPos - 1, currentYPos] = true;
+                Vector3 endRoomPos = currentRoom.transform.position;
+                endRoomPos.x -= xOffset;
+                //don't think I need to save reference to this since I'm not using it
+                GameObject instantiatedEndRoom = Instantiate(leftBranchEndRoom, endRoomPos, Quaternion.identity);
+            }
+            if(roomData.rightOpening && !rooms[currentXPos + 1, currentYPos]) {
+                rooms[currentXPos + 1, currentYPos] = true;
+                Vector3 endRoomPos = currentRoom.transform.position;
+                endRoomPos.x += xOffset;
+                //don't think I need to save reference to this since I'm not using it
+                GameObject instantiatedEndRoom = Instantiate(rightBranchEndRoom, endRoomPos, Quaternion.identity);
+            }
+            if(roomData.downOpening && !rooms[currentXPos, currentYPos + 1]) {
+                rooms[currentXPos, currentYPos + 1] = true;
+                Vector3 endRoomPos = currentRoom.transform.position;
+                endRoomPos.y -= yOffset;
+                //don't think I need to save reference to this since I'm not using it
+                GameObject instantiatedEndRoom = Instantiate(downBranchEndRoom, endRoomPos, Quaternion.identity);
+            }
+            //breaks the recursion on this branch!
+            return;
+        }
 
         //check each opening *independently*
         //order doesn't really matter
         //find a way to loop these? each room keeps track of the number of openings it has
 
         if(roomData.upOpening) {
-            if(currentYPos - 1 >= 0 && !rooms[currentXPos, currentYPos - 1]) {
+            //in bounds and there isn't a room, place one do all that
+            if(currentYPos - 1 > 0 && !rooms[currentXPos, currentYPos - 1]) {
                 //this room is in the grid and there isn't anything already there
                 rooms[currentXPos, currentYPos - 1] = true;
+
+                Debug.Log("Next room coordinate: (" + currentXPos + ", " + (currentYPos + 1) + ")");
 
                 //picks a room from possibilities!
                 int randIndex = Random.Range(0, downOpeningRooms.Length);
@@ -92,7 +129,9 @@ public class RoomGenerator : MonoBehaviour
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos - 1);
             }
-            else {
+            //just because we go out of bounds doesn't mean there isn't already a room there! have to check??
+            else if(!rooms[currentXPos, currentYPos - 1]) {
+                rooms[currentXPos, currentYPos - 1] = true;
                 //generate ending room, does't call recursion function
                 Debug.Log("hit the top of the grid, placing barrier room to stop recursion");
                 Vector3 endRoomPos = currentRoom.transform.position;
@@ -104,9 +143,11 @@ public class RoomGenerator : MonoBehaviour
         }
 
         if(roomData.leftOpening) {
-            if(currentXPos - 1 >= 0 && !rooms[currentXPos - 1, currentYPos]) {
+            if(currentXPos - 1 > 0 && !rooms[currentXPos - 1, currentYPos]) {
                 //this room is in the grid and there isn't anything already there
                 rooms[currentXPos - 1, currentYPos] = true;
+
+                Debug.Log("Next room coordinate: (" + (currentXPos - 1) + ", " + currentYPos + ")");
 
                 //picks a room from possibilities!
                 int randIndex = Random.Range(0, rightOpeningRooms.Length);
@@ -131,7 +172,8 @@ public class RoomGenerator : MonoBehaviour
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos - 1, currentYPos);
             }
-            else {
+            else if(!rooms[currentXPos - 1, currentYPos])  {
+                rooms[currentXPos - 1, currentYPos] = true;
                 //generate ending room, does't call recursion function
                 Debug.Log("hit the left of the grid, placing barrier room to stop recursion");
                 Vector3 endRoomPos = currentRoom.transform.position;
@@ -142,9 +184,11 @@ public class RoomGenerator : MonoBehaviour
         }
 
         if(roomData.rightOpening) {
-            if(currentXPos + 1 < width && !rooms[currentXPos + 1, currentYPos]) {
+            if(currentXPos + 1 < width - 1 && !rooms[currentXPos + 1, currentYPos]) {
                 //this room is in the grid and there isn't anything already there
-                rooms[currentXPos - 1, currentYPos] = true;
+                rooms[currentXPos + 1, currentYPos] = true;
+
+                Debug.Log("Next room coordinate: (" + (currentXPos + 1) + ", " + currentYPos + ")");
 
                 //picks a room from possibilities!
                 int randIndex = Random.Range(0, leftOpeningRooms.Length);
@@ -169,7 +213,8 @@ public class RoomGenerator : MonoBehaviour
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos + 1, currentYPos);
             }
-            else {
+            else if(!rooms[currentXPos + 1, currentYPos]) {
+                rooms[currentXPos + 1, currentYPos] = true;
                 //generate ending room, does't call recursion function
                 Debug.Log("hit the right of the grid, placing barrier room to stop recursion");
                 Vector3 endRoomPos = currentRoom.transform.position;
@@ -180,9 +225,11 @@ public class RoomGenerator : MonoBehaviour
         }
 
         if(roomData.downOpening) {
-            if(currentYPos + 1 < height && !rooms[currentXPos, currentYPos + 1]) {
+            if(currentYPos + 1 < height - 1 && !rooms[currentXPos, currentYPos + 1]) {
                 //this room is in the grid and there isn't anything already there
                 rooms[currentXPos, currentYPos + 1] = true;
+
+                Debug.Log("Next room coordinate: (" + currentXPos + ", " + (currentYPos + 1) + ")");
 
                 //picks a room from possibilities!
                 int randIndex = Random.Range(0, upOpeningRooms.Length);
@@ -207,7 +254,8 @@ public class RoomGenerator : MonoBehaviour
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos + 1);
             }
-            else {
+            else if(!rooms[currentXPos, currentYPos - 1]) {
+                rooms[currentXPos, currentYPos + 1] = true;
                 //generate ending room, does't call recursion function
                 Debug.Log("hit the bottom of the grid, placing barrier room to stop recursion");
                 Vector3 endRoomPos = currentRoom.transform.position;
