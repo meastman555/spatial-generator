@@ -53,6 +53,7 @@ public class RoomGenerator : MonoBehaviour
     //--> rooms are still generating on top of each other in some cases. not sure why, but need to fix
     //--> a few blocks, in that rooms with openings don't lead to another room correctly, hits the wall. i think this is caused by the branch generation of another set of rooms not communicating with others, leading to linear paths that block each other off
     //-----> maybe each room checks more of its surroundings before deciding which to place?
+    //--> could abstract and refactor this into a couple functions, I think that would be good
     void recursivelyGenerateNextRoom(int currentDepth, GameObject currentRoom, int currentXPos, int currentYPos) {
         RoomData roomData = currentRoom.GetComponent<RoomData>();
 
@@ -116,7 +117,6 @@ public class RoomGenerator : MonoBehaviour
                     nextRoom = downOpeningRooms[randIndex];
                 }
 
-                //TODO: this is where a grammer will be placed to change the base room's attributes before instantiating!
                 //set up all the needed data then create the room
                 Vector3 nextRoomPos = currentRoom.transform.position;
                 nextRoomPos.y += yOffset;
@@ -125,6 +125,12 @@ public class RoomGenerator : MonoBehaviour
                 Debug.Log("Generating room at: " + nextRoomPos);
                 
                 GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
+
+                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
+                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
+                string roomTypeName = RoomGrammar.roomTypes[r];
+                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
+                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
 
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos - 1);
@@ -159,7 +165,6 @@ public class RoomGenerator : MonoBehaviour
                     nextRoom = rightOpeningRooms[randIndex];
                 }
 
-                //TODO: this is where a grammer will be placed to change the base room's attributes before instantiating!
                 //set up all the needed data then create the room
                 Vector3 nextRoomPos = currentRoom.transform.position;
                 nextRoomPos.x -= xOffset;
@@ -168,6 +173,12 @@ public class RoomGenerator : MonoBehaviour
                 Debug.Log("Generating room at: " + nextRoomPos);
 
                 GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
+
+                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
+                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
+                string roomTypeName = RoomGrammar.roomTypes[r];
+                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
+                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
 
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos - 1, currentYPos);
@@ -200,7 +211,6 @@ public class RoomGenerator : MonoBehaviour
                     nextRoom = leftOpeningRooms[randIndex];
                 }
 
-                //TODO: this is where a grammer will be placed to change the base room's attributes before instantiating!
                 //set up all the needed data then create the room
                 Vector3 nextRoomPos = currentRoom.transform.position;
                 nextRoomPos.x += xOffset;
@@ -209,6 +219,12 @@ public class RoomGenerator : MonoBehaviour
                 Debug.Log("Generating room at: " + nextRoomPos);
 
                 GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
+
+                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
+                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
+                string roomTypeName = RoomGrammar.roomTypes[r];
+                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
+                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
 
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos + 1, currentYPos);
@@ -241,7 +257,6 @@ public class RoomGenerator : MonoBehaviour
                     nextRoom = upOpeningRooms[randIndex];
                 }
 
-                //TODO: this is where a grammer will be placed to change the base room's attributes before instantiating!
                 //set up all the needed data then create the room
                 Vector3 nextRoomPos = currentRoom.transform.position;
                 nextRoomPos.y -= yOffset;
@@ -250,6 +265,12 @@ public class RoomGenerator : MonoBehaviour
                 Debug.Log("Generating room at: " + nextRoomPos);
 
                 GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
+    
+                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
+                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
+                string roomTypeName = RoomGrammar.roomTypes[r];
+                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
+                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
 
                 //recursively branch!
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos + 1);
