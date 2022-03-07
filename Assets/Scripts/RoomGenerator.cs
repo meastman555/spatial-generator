@@ -53,7 +53,7 @@ public class RoomGenerator : MonoBehaviour
     //--> rooms are still generating on top of each other in some cases. not sure why, but need to fix
     //--> a few blocks, in that rooms with openings don't lead to another room correctly, hits the wall. i think this is caused by the branch generation of another set of rooms not communicating with others, leading to linear paths that block each other off
     //-----> maybe each room checks more of its surroundings before deciding which to place?
-    //--> could abstract and refactor this into a couple functions, I think that would be good
+    //--> ^ before a room is placed, need to check the cell's neighbors to see if there are any openings that HAVE to be matches (prevents a wall being thrown where there shouldn't be)
     void recursivelyGenerateNextRoom(int currentDepth, GameObject currentRoom, int currentXPos, int currentYPos) {
         RoomData roomData = currentRoom.GetComponent<RoomData>();
 
@@ -62,228 +62,140 @@ public class RoomGenerator : MonoBehaviour
 
         //depth check, make sure all the openings of the current room are closed and end branching
         if(currentDepth > recursionDepth) {
-            //for now, manually check each opening like recursive cases
-            if(roomData.upOpening && !rooms[currentXPos, currentYPos - 1]) {
-                rooms[currentXPos, currentYPos - 1] = true;
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.y += yOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(upBranchEndRoom, endRoomPos, Quaternion.identity);
-            }
-            if(roomData.leftOpening && !rooms[currentXPos - 1, currentYPos]) {
-                rooms[currentXPos - 1, currentYPos] = true;
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.x -= xOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(leftBranchEndRoom, endRoomPos, Quaternion.identity);
-            }
-            if(roomData.rightOpening && !rooms[currentXPos + 1, currentYPos]) {
-                rooms[currentXPos + 1, currentYPos] = true;
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.x += xOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(rightBranchEndRoom, endRoomPos, Quaternion.identity);
-            }
-            if(roomData.downOpening && !rooms[currentXPos, currentYPos + 1]) {
-                rooms[currentXPos, currentYPos + 1] = true;
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.y -= yOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(downBranchEndRoom, endRoomPos, Quaternion.identity);
-            }
+            placeEndingRoom(roomData, currentRoom, currentXPos, currentYPos);
             //breaks the recursion on this branch!
             return;
         }
 
-        //check each opening *independently*
-        //order doesn't really matter
-        //find a way to loop these? each room keeps track of the number of openings it has
+        //checkes each opening of the current room independently and kicks off recursion if the next room is in bounds and there is an available spot
+        //if the next room would go out of bounds, but there isn't one there, end the branch by placing a dead-end ending room
 
         if(roomData.upOpening) {
-            //in bounds and there isn't a room, place one do all that
+            //in bounds and there isn't already a room
             if(currentYPos - 1 > 0 && !rooms[currentXPos, currentYPos - 1]) {
-                //this room is in the grid and there isn't anything already there
-                rooms[currentXPos, currentYPos - 1] = true;
-
-                Debug.Log("Next room coordinate: (" + currentXPos + ", " + (currentYPos + 1) + ")");
-
-                //picks a room from possibilities!
-                int randIndex = Random.Range(0, downOpeningRooms.Length);
-                GameObject nextRoom = downOpeningRooms[randIndex];
-                //ensures that there will not be an immediate dead end on a room that should branch
-                //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-                while(nextRoom.GetComponent<RoomData>().numOpenings == 1) { 
-                    randIndex = Random.Range(0, downOpeningRooms.Length);
-                    nextRoom = downOpeningRooms[randIndex];
-                }
-
-                //set up all the needed data then create the room
-                Vector3 nextRoomPos = currentRoom.transform.position;
-                nextRoomPos.y += yOffset;
-
-                Debug.Log("Current room at:" + currentRoom.transform.position);
-                Debug.Log("Generating room at: " + nextRoomPos);
-                
-                GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
-
-                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
-                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
-                string roomTypeName = RoomGrammar.roomTypes[r];
-                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
-                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
-
-                //recursively branch!
+                GameObject instantiatedRoom = pickAndPlaceRoom(downOpeningRooms, currentRoom, currentXPos, currentYPos, 0, -1);
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos - 1);
             }
-            //just because we go out of bounds doesn't mean there isn't already a room there! have to check??
+            //if the out of bounds check above breaks, still only want to place a room if there isn't already something there
             else if(!rooms[currentXPos, currentYPos - 1]) {
-                rooms[currentXPos, currentYPos - 1] = true;
-                //generate ending room, does't call recursion function
-                Debug.Log("hit the top of the grid, placing barrier room to stop recursion");
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.y += yOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(upBranchEndRoom, endRoomPos, Quaternion.identity);
+                //don't need to keep track of this room because it's not used for any more generation
+                placeEndingRoom(roomData, currentRoom, currentXPos, currentYPos);
             }
-
         }
 
         if(roomData.leftOpening) {
+            //in bounds and there isn't already a room
             if(currentXPos - 1 > 0 && !rooms[currentXPos - 1, currentYPos]) {
-                //this room is in the grid and there isn't anything already there
-                rooms[currentXPos - 1, currentYPos] = true;
-
-                Debug.Log("Next room coordinate: (" + (currentXPos - 1) + ", " + currentYPos + ")");
-
-                //picks a room from possibilities!
-                int randIndex = Random.Range(0, rightOpeningRooms.Length);
-                GameObject nextRoom = rightOpeningRooms[randIndex];
-                //ensures that there will not be an immediate dead end on a room that should branch
-                //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-                while(nextRoom.GetComponent<RoomData>().numOpenings == 1) { 
-                    randIndex = Random.Range(0, rightOpeningRooms.Length);
-                    nextRoom = rightOpeningRooms[randIndex];
-                }
-
-                //set up all the needed data then create the room
-                Vector3 nextRoomPos = currentRoom.transform.position;
-                nextRoomPos.x -= xOffset;
-
-                Debug.Log("Current room at:" + currentRoom.transform.position);
-                Debug.Log("Generating room at: " + nextRoomPos);
-
-                GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
-
-                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
-                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
-                string roomTypeName = RoomGrammar.roomTypes[r];
-                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
-                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
-
-                //recursively branch!
+                GameObject instantiatedRoom = pickAndPlaceRoom(rightOpeningRooms, currentRoom, currentXPos, currentYPos, -1, 0);
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos - 1, currentYPos);
             }
+            //if the out of bounds check above breaks, still only want to place a room if there isn't already something there
             else if(!rooms[currentXPos - 1, currentYPos])  {
-                rooms[currentXPos - 1, currentYPos] = true;
-                //generate ending room, does't call recursion function
-                Debug.Log("hit the left of the grid, placing barrier room to stop recursion");
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.x -= xOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(leftBranchEndRoom, endRoomPos, Quaternion.identity);
+                //don't need to keep track of this room because it's not used for any more generation
+                placeEndingRoom(roomData, currentRoom, currentXPos, currentYPos);
             }
         }
 
         if(roomData.rightOpening) {
+            //in bounds and there isn't already a room
             if(currentXPos + 1 < width - 1 && !rooms[currentXPos + 1, currentYPos]) {
-                //this room is in the grid and there isn't anything already there
-                rooms[currentXPos + 1, currentYPos] = true;
-
-                Debug.Log("Next room coordinate: (" + (currentXPos + 1) + ", " + currentYPos + ")");
-
-                //picks a room from possibilities!
-                int randIndex = Random.Range(0, leftOpeningRooms.Length);
-                GameObject nextRoom = leftOpeningRooms[randIndex];
-                //ensures that there will not be an immediate dead end on a room that should branch
-                //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-                while(nextRoom.GetComponent<RoomData>().numOpenings == 1) { 
-                    randIndex = Random.Range(0, leftOpeningRooms.Length);
-                    nextRoom = leftOpeningRooms[randIndex];
-                }
-
-                //set up all the needed data then create the room
-                Vector3 nextRoomPos = currentRoom.transform.position;
-                nextRoomPos.x += xOffset;
-
-                Debug.Log("Current room at:" + currentRoom.transform.position);
-                Debug.Log("Generating room at: " + nextRoomPos);
-
-                GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
-
-                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
-                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
-                string roomTypeName = RoomGrammar.roomTypes[r];
-                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
-                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
-
-                //recursively branch!
+                GameObject instantiatedRoom = pickAndPlaceRoom(leftOpeningRooms, currentRoom, currentXPos, currentYPos, 1, 0);
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos + 1, currentYPos);
             }
+            //if the out of bounds check above breaks, still only want to place a room if there isn't already something there
             else if(!rooms[currentXPos + 1, currentYPos]) {
-                rooms[currentXPos + 1, currentYPos] = true;
-                //generate ending room, does't call recursion function
-                Debug.Log("hit the right of the grid, placing barrier room to stop recursion");
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.x += xOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(rightBranchEndRoom, endRoomPos, Quaternion.identity);
+                //don't need to keep track of this room because it's not used for any more generation
+                placeEndingRoom(roomData, currentRoom, currentXPos, currentYPos);
             }
         }
 
         if(roomData.downOpening) {
+            //in bounds and there isn't already a room
             if(currentYPos + 1 < height - 1 && !rooms[currentXPos, currentYPos + 1]) {
-                //this room is in the grid and there isn't anything already there
-                rooms[currentXPos, currentYPos + 1] = true;
-
-                Debug.Log("Next room coordinate: (" + currentXPos + ", " + (currentYPos + 1) + ")");
-
-                //picks a room from possibilities!
-                int randIndex = Random.Range(0, upOpeningRooms.Length);
-                GameObject nextRoom = upOpeningRooms[randIndex];
-                //ensures that there will not be an immediate dead end on a room that should branch
-                //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-                while(nextRoom.GetComponent<RoomData>().numOpenings == 1) { 
-                    randIndex = Random.Range(0, upOpeningRooms.Length);
-                    nextRoom = upOpeningRooms[randIndex];
-                }
-
-                //set up all the needed data then create the room
-                Vector3 nextRoomPos = currentRoom.transform.position;
-                nextRoomPos.y -= yOffset;
-                
-                Debug.Log("Current room at:" + currentRoom.transform.position);
-                Debug.Log("Generating room at: " + nextRoomPos);
-
-                GameObject instantiatedRoom = Instantiate(nextRoom, nextRoomPos, Quaternion.identity);
-    
-                //TODO: this is where a grammer will be placed to change the instantiated room's attributes!
-                int r = Random.Range(0, RoomGrammar.roomTypes.Length);
-                string roomTypeName = RoomGrammar.roomTypes[r];
-                Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName]; 
-                instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
-
-                //recursively branch!
+                GameObject instantiatedRoom = pickAndPlaceRoom(upOpeningRooms, currentRoom, currentXPos, currentYPos, 0, 1);
                 recursivelyGenerateNextRoom(currentDepth + 1, instantiatedRoom, currentXPos, currentYPos + 1);
             }
-            else if(!rooms[currentXPos, currentYPos - 1]) {
-                rooms[currentXPos, currentYPos + 1] = true;
-                //generate ending room, does't call recursion function
-                Debug.Log("hit the bottom of the grid, placing barrier room to stop recursion");
-                Vector3 endRoomPos = currentRoom.transform.position;
-                endRoomPos.y -= yOffset;
-                //don't think I need to save reference to this since I'm not using it
-                GameObject instantiatedEndRoom = Instantiate(downBranchEndRoom, endRoomPos, Quaternion.identity);
+            //if the out of bounds check above breaks, still only want to place a room if there isn't already something there
+            else if(!rooms[currentXPos, currentYPos + 1]) {
+                //don't need to keep track of this room because it's not used for any more generation
+                placeEndingRoom(roomData, currentRoom, currentXPos, currentYPos);
             }
+        }
+    }
+
+    //two step process to handle the next room based on the current, and some additional info
+    //calls two separate methods to further clarify their separation (grammars are handled in placeRoom since that's where they need to be applied)
+    private GameObject pickAndPlaceRoom(GameObject[] listOfPossibleRooms, GameObject currentRoom, int currentXPos, int currentYPos, int dx, int dy) {
+        GameObject nextRoomPrefab = pickRoom(listOfPossibleRooms);
+        GameObject instantiatedRoom = placeRoom(nextRoomPrefab, currentRoom, currentXPos, currentYPos, dx, dy);
+
+        return instantiatedRoom;
+    }
+
+    //picks a random room prefab based from the ones specified
+    private GameObject pickRoom(GameObject[] listOfPossibleRooms) {
+        //picks a room from possibilities!
+        int roomIndex = Random.Range(0, listOfPossibleRooms.Length);
+        GameObject nextRoomPrefab = listOfPossibleRooms[roomIndex];
+        //ensures that there will not be an immediate dead end on a room that should branch
+        //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
+        while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1) { 
+            roomIndex = Random.Range(0, downOpeningRooms.Length);
+            nextRoomPrefab = downOpeningRooms[roomIndex];
+        }
+
+        return nextRoomPrefab;
+    }
+
+    //places a new room in relation to the current room given a prefab, coordinates, and direction (dx, dy)
+    //can be called without pickRoom first (in the example of placing ending rooms) 
+    private GameObject placeRoom(GameObject nextRoomPrefab, GameObject currentRoom, int currentXPos, int currentYPos, int dx, int dy) {
+        Debug.Log("Next room coordinate: (" + (currentXPos + dx) + ", " + (currentYPos + dy) + ")");
+
+        rooms[currentXPos + dx, currentYPos + dy] = true;
+        //set up all needed data then instnatiate the room
+        //TODO: more initializations need for instantiation?
+        Vector3 nextRoomPos = currentRoom.transform.position;
+        nextRoomPos.x += (xOffset * dx);
+        //dy is negated because moving up in the rooms array (dy = -1) actually moves positively up in world space -- and vice-versa -- so flip
+        nextRoomPos.y += (yOffset * -dy);
+
+        Debug.Log("Current room at:" + currentRoom.transform.position);
+        Debug.Log("Generating room at: " + nextRoomPos);
+
+        GameObject instantiatedRoom = Instantiate(nextRoomPrefab, nextRoomPos, Quaternion.identity);
+        //does the grammars! applies to the instantiated room, so we don't edit the prefab
+        instantiatedRoom = applyGrammars(instantiatedRoom);
+
+        return instantiatedRoom;
+    }
+
+    //applies the various grammars to this room and edits it as needed
+    //TODO: more grammar stuff! For now just assigns the room a color based on pulled type, but do more
+    private GameObject applyGrammars(GameObject instantiatedRoom) {
+        int typeIndex = Random.Range(0, RoomGrammar.roomTypes.Length);
+        string roomTypeName = RoomGrammar.roomTypes[typeIndex];
+        Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName];
+        instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
+
+        return instantiatedRoom;
+    }
+
+    //places an ending room (only one opening that complements current room exit) to stop this recursive branch of generation
+    private void placeEndingRoom(RoomData roomData, GameObject currentRoom, int currentXPos, int currentYPos) {
+        //for now, manually check each opening like recursive cases
+        //placeRoom returns a room, but since this is the ending room we don't need to keep track of it for anything else in generation and can discard
+        if(roomData.upOpening && !rooms[currentXPos, currentYPos - 1]) {
+            placeRoom(upBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, -1);
+        }
+        if(roomData.leftOpening && !rooms[currentXPos - 1, currentYPos]) {
+            placeRoom(leftBranchEndRoom, currentRoom, currentXPos, currentYPos, -1, 0);
+        }
+        if(roomData.rightOpening && !rooms[currentXPos + 1, currentYPos]) {
+            placeRoom(rightBranchEndRoom, currentRoom, currentXPos, currentYPos, 1, 0);
+        }
+        if(roomData.downOpening && !rooms[currentXPos, currentYPos + 1]) {
+            placeRoom(downBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, 1);
         }
     }
 }

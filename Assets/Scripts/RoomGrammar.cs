@@ -4,6 +4,8 @@ using UnityEngine;
 
 //just a regular C# class, used to store data; does not interact with unity or game objects at all
 //for now english grammars and their game-space equivalents are defined here, not in editor
+//TODO: tweak and allow for editor-specified values all around (using dictionaries)
+//--> add static items for item rooms and enemies for enemy rooms (to illustrate that grammar works more than just color)
 public class RoomGrammar
 {
     //TODO: something for room size (short, long, big, small, horizontal vs vertical, enormous, etc)
