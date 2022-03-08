@@ -44,6 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b7987a793fc04848b0f975cbbd64b21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomContainerObject: {fileID: 0}
   width: 25
   height: 25
   recursionDepth: 5
@@ -88,10 +89,6 @@ MonoBehaviour:
   - {fileID: 6724744035663086668, guid: c59bc6e1127291b47b0a540564059b3a, type: 3}
   - {fileID: 6724744035663086668, guid: dc137ab5c5460604681988fefc6382ad, type: 3}
   - {fileID: 6724744035663086668, guid: 88ef20eaf9920ba44803dc3cb85fa780, type: 3}
-  upBranchEndRoom: {fileID: 6724744035663086668, guid: ddda24de5fba768468ba15a9a670dc34, type: 3}
-  leftBranchEndRoom: {fileID: 6724744035663086668, guid: eafe2bb08b09fe545bc50cb6b6040e01, type: 3}
-  rightBranchEndRoom: {fileID: 6724744035663086668, guid: 59bc31f47725b814186e60b72fd77fc4, type: 3}
-  downBranchEndRoom: {fileID: 6724744035663086668, guid: 31811a1d08afbfa4e90ed25973338231, type: 3}
 --- !u!114 &834202942231043338
 MonoBehaviour:
   m_ObjectHideFlags: 0

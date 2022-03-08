@@ -2,7 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-//There is almost certainly a more efficient way to do some of this, which I'll look into for my final!
+//TODO for use in final project
+//--add more grammars! I think it would be interesting to add some grammars that change the size of rooms (make them long an thin, really large, etc)
+//--find a more efficient way to do things (specifically looping each time the current roomtype needs to be accessed)? 
+//--abstract this out of the wang tile room generation compeletely so the two don't overlap, instead just work on the same instanced room separately? (mentioned in comment in RoomGenerator.cs)
 public class RoomGrammar : MonoBehaviour
 {
     //dictionaries or structs are not editor serializable so use a small custom nested class to store relevant data
@@ -10,18 +13,17 @@ public class RoomGrammar : MonoBehaviour
     public class RoomType {
         public string name;
         public Color color;
-        //TODO: make more general -- this *has* to be a multiple of 10 integer percentage out of 100 for now
+        //need to make more general -- this *has* to be a multiple of 10 integer percentage out of 100 for now
         public int chance;
         public GameObject[] possiblePlacedObjects;
     }
     public RoomType[] roomTypes;
 
-    //TODO: other grammars?
-
+    //will end up storing 10 strings, as a way to weight which one could get picked through randomly indexing in
     private ArrayList roomTypeNamesGrammar;
 
     void Start() {
-        //creates the actual grammar by keeping a list of weighted strings corresponding to room types
+        //creates the actual grammar
         roomTypeNamesGrammar = new ArrayList();
         foreach(RoomType rt in roomTypes) {
             //this only works because the chances are assumed to be integer numbers in multiples of 10 from 0 to 100
@@ -60,7 +62,7 @@ public class RoomGrammar : MonoBehaviour
         return hasObjects;
     }
 
-    //for now, just assumes a normal distribution of each object's chance
+    //for now, just assumes a normal distribution of each object's chance of being picked
     public GameObject pickObjectToPlaceInRoom(string roomTypeName) {
         RoomType currentRT = getRoomType(roomTypeName);
         int randIndex = Random.Range(0, currentRT.possiblePlacedObjects.Length);
