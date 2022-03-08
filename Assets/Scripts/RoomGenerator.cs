@@ -126,25 +126,48 @@ public class RoomGenerator : MonoBehaviour
     //two step process to handle the next room based on the current, and some additional info
     //calls two separate methods to further clarify their separation (grammars are handled in placeRoom since that's where they need to be applied)
     private GameObject pickAndPlaceRoom(GameObject[] listOfPossibleRooms, GameObject currentRoom, int currentXPos, int currentYPos, int dx, int dy) {
-        GameObject nextRoomPrefab = pickRoom(listOfPossibleRooms);
+        GameObject nextRoomPrefab = pickRoom(listOfPossibleRooms, currentXPos, currentYPos, dx, dy);
         GameObject instantiatedRoom = placeRoom(nextRoomPrefab, currentRoom, currentXPos, currentYPos, dx, dy);
 
         return instantiatedRoom;
     }
 
     //picks a random room prefab based from the ones specified
-    private GameObject pickRoom(GameObject[] listOfPossibleRooms) {
+    private GameObject pickRoom(GameObject[] listOfPossibleRooms, int currentXPos, int currentYPos, int dx, int dy) {
         //picks a room from possibilities!
         int roomIndex = Random.Range(0, listOfPossibleRooms.Length);
         GameObject nextRoomPrefab = listOfPossibleRooms[roomIndex];
         //ensures that there will not be an immediate dead end on a room that should branch
         //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-        while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1) { 
+        while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1 && roomWouldConnect(nextRoomPrefab, currentXPos + dx, currentYPos + dy)) { 
             roomIndex = Random.Range(0, downOpeningRooms.Length);
             nextRoomPrefab = downOpeningRooms[roomIndex];
         }
 
         return nextRoomPrefab;
+    }
+
+    //given a potential room, make sure it has complementary openings to any rooms that it would connect with (not just currentRoom)
+    //nextRoomX and nextRoomY are guaranteed to be in bounds of rooms array, since that gets checked before this method is called
+    private bool roomWouldConnect(GameObject potentialRoomPrefab, int nextRoomX, int nextRoomY) {
+        RoomData rd = potentialRoomPrefab.GetComponent<RoomData>();
+        //for each opening this potential room has, check the neighbor (if any) at that opening to make sure they can connect
+        //if all openings connect, return true, if not, return false and pick again
+        //all of these will short circuit if the neighbor is out of bounds of the array
+        //TODO: have to change rooms to be array of RoomData, because that's all we care about? Change to GameObjects later if those are needed for like grammars?
+        if(rd.upOpening && (nextRoomY - 1 > 0) && rooms[nextRoomX, nextRoomY - 1]) {
+            //check that neighboring up room has down opening
+        } 
+        if(rd.leftOpening && (nextRoomX - 1 > 0) && rooms[nextRoomX - 1, nextRoomY]) {
+            //check that neighboring left room has right opening
+        }
+        if(rd.rightOpening && (nextRoomX + 1 < width - 1) && rooms[nextRoomX + 1, nextRoomY]) {
+            //check that neighboring right room has left opening
+        }
+        if(rd.downOpening && (nextRoomY + 1 < height - 1) && rooms[nextRoomX, nextRoomY + 1]) {
+            //check that neighboring down room has up opening
+        }
+        return false;
     }
 
     //places a new room in relation to the current room given a prefab, coordinates, and direction (dx, dy)
