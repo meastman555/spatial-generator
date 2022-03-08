@@ -34,6 +34,7 @@ public class RoomGenerator : MonoBehaviour
 
     void Start()
 	{
+        Debug.Log("starting generation");
         //some offsets here to account for the buffer around the actual grid (determines when a barrier room should be placed to stop branch)
         rooms = new GameObject[width + 2, height + 2];
         GameObject instantiatedStartingRoom = Instantiate(startingRoom, new Vector3(0.0f, 0.0f, 0.0f), Quaternion.identity);
@@ -50,7 +51,7 @@ public class RoomGenerator : MonoBehaviour
     void recursivelyGenerateNextRoom(int currentDepth, GameObject currentRoom, int currentXPos, int currentYPos) {
         RoomData roomData = currentRoom.GetComponent<RoomData>();
 
-        Debug.Log("room type: " + currentRoom.name);
+        Debug.Log("room structure: " + currentRoom.name);
         Debug.Log("number of openings on the room: " + roomData.numOpenings);
 
         //depth check, make sure all the openings of the current room are closed and end branching
@@ -131,9 +132,15 @@ public class RoomGenerator : MonoBehaviour
         GameObject nextRoomPrefab = listOfPossibleRooms[roomIndex];
         //ensures that there will not be an immediate dead end on a room that should branch
         //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
+        ArrayList failedIndices = new ArrayList();
         while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1 || !roomWouldConnect(nextRoomPrefab, currentXPos + dx, currentYPos + dy)) { 
-            roomIndex = Random.Range(0, downOpeningRooms.Length);
-            nextRoomPrefab = downOpeningRooms[roomIndex];
+            failedIndices.Add(roomIndex);
+            roomIndex = Random.Range(0, listOfPossibleRooms.Length);
+            //TODO: is this needed? less expensive to calculate a new index than it is to look through all the rooms and neighbors (I think... Contains is O(N) though) which is unnecessary for already tried rooms 
+            while(failedIndices.Contains(roomIndex)) {
+                roomIndex = Random.Range(0, listOfPossibleRooms.Length);
+            }
+            nextRoomPrefab = listOfPossibleRooms[roomIndex];
         }
 
         return nextRoomPrefab;
@@ -221,20 +228,25 @@ public class RoomGenerator : MonoBehaviour
     }
 
     //places an ending room (only one opening that complements current room exit) to stop this recursive branch of generation
+    //TODO: the openings do not always line up with surrounding neighbors, because we don't check for fit (like in roomWouldConnect) -- refactor/use that method so that these can match all openings too
     private void placeEndingRoom(RoomData roomData, GameObject currentRoom, int currentXPos, int currentYPos) {
         //for now, manually check each opening like recursive cases
         //placeRoom returns a room, but since this is the ending room we don't need to keep track of it for anything else in generation and can discard
         if(roomData.upOpening && !rooms[currentXPos, currentYPos - 1]) {
-            placeRoom(upBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, -1);
+            GameObject finalRoom = placeRoom(upBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, -1);
+            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.leftOpening && !rooms[currentXPos - 1, currentYPos]) {
-            placeRoom(leftBranchEndRoom, currentRoom, currentXPos, currentYPos, -1, 0);
+            GameObject finalRoom = placeRoom(leftBranchEndRoom, currentRoom, currentXPos, currentYPos, -1, 0);
+            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.rightOpening && !rooms[currentXPos + 1, currentYPos]) {
-            placeRoom(rightBranchEndRoom, currentRoom, currentXPos, currentYPos, 1, 0);
+            GameObject finalRoom = placeRoom(rightBranchEndRoom, currentRoom, currentXPos, currentYPos, 1, 0);
+            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.downOpening && !rooms[currentXPos, currentYPos + 1]) {
-            placeRoom(downBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, 1);
+            GameObject finalRoom = placeRoom(downBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, 1);
+            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
     }
 }
