@@ -30,14 +30,14 @@ public class RoomGenerator : MonoBehaviour
     [SerializeField] private GameObject rightBranchEndRoom;
     [SerializeField] private GameObject downBranchEndRoom;
 
-    private bool[,] rooms;
+    private GameObject[,] rooms;
 
     void Start()
 	{
         //some offsets here to account for the buffer around the actual grid (determines when a barrier room should be placed to stop branch)
-        rooms = new bool[width + 2, height + 2];
-        rooms[startingXCoord + 1, startingYCoord + 1] = true;
+        rooms = new GameObject[width + 2, height + 2];
         GameObject instantiatedStartingRoom = Instantiate(startingRoom, new Vector3(0.0f, 0.0f, 0.0f), Quaternion.identity);
+        rooms[startingXCoord + 1, startingYCoord + 1] = instantiatedStartingRoom;
         recursivelyGenerateNextRoom(1, instantiatedStartingRoom, startingXCoord + 1, startingYCoord + 1);
     }
 
@@ -47,13 +47,6 @@ public class RoomGenerator : MonoBehaviour
     //-- if the next placed room would be in a spot that already has a room (multiple shared openings that create a loop), don't place anything and move on (end recursion)
     //-- if this iteration would exceed the specified recursion depth, don't do anything
     //the way the indecies and bounds are set up, there should never be an out of bound error on the array, but I'm not using assert statements nor proofs so this is more anecdoatal. find a way to guarantee?
-
-    //TODO: few things
-    //--> sometimes the first room (specified as just U) will regenerate on top of itself at the very end. not sure why, doens't seem to be negatively affecting things, but look in to
-    //--> rooms are still generating on top of each other in some cases. not sure why, but need to fix
-    //--> a few blocks, in that rooms with openings don't lead to another room correctly, hits the wall. i think this is caused by the branch generation of another set of rooms not communicating with others, leading to linear paths that block each other off
-    //-----> maybe each room checks more of its surroundings before deciding which to place?
-    //--> ^ before a room is placed, need to check the cell's neighbors to see if there are any openings that HAVE to be matches (prevents a wall being thrown where there shouldn't be)
     void recursivelyGenerateNextRoom(int currentDepth, GameObject currentRoom, int currentXPos, int currentYPos) {
         RoomData roomData = currentRoom.GetComponent<RoomData>();
 
@@ -69,7 +62,6 @@ public class RoomGenerator : MonoBehaviour
 
         //checkes each opening of the current room independently and kicks off recursion if the next room is in bounds and there is an available spot
         //if the next room would go out of bounds, but there isn't one there, end the branch by placing a dead-end ending room
-
         if(roomData.upOpening) {
             //in bounds and there isn't already a room
             if(currentYPos - 1 > 0 && !rooms[currentXPos, currentYPos - 1]) {
@@ -139,7 +131,7 @@ public class RoomGenerator : MonoBehaviour
         GameObject nextRoomPrefab = listOfPossibleRooms[roomIndex];
         //ensures that there will not be an immediate dead end on a room that should branch
         //just re-pick a room until one works (probably not great practice but there are only 8 choices and only one invalid one so it shouldn't take long)
-        while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1 && roomWouldConnect(nextRoomPrefab, currentXPos + dx, currentYPos + dy)) { 
+        while(nextRoomPrefab.GetComponent<RoomData>().numOpenings == 1 || !roomWouldConnect(nextRoomPrefab, currentXPos + dx, currentYPos + dy)) { 
             roomIndex = Random.Range(0, downOpeningRooms.Length);
             nextRoomPrefab = downOpeningRooms[roomIndex];
         }
@@ -149,25 +141,49 @@ public class RoomGenerator : MonoBehaviour
 
     //given a potential room, make sure it has complementary openings to any rooms that it would connect with (not just currentRoom)
     //nextRoomX and nextRoomY are guaranteed to be in bounds of rooms array, since that gets checked before this method is called
+    //returns false if any misalignments are found, true if it passes all of them -- have to check both ways for any neighbor
+    //TODO: this does not get called when ending rooms are placed (in placeEndRoom), meaning that there is a small chance those rooms will not connect to other correctly (but overall this seems to work)
     private bool roomWouldConnect(GameObject potentialRoomPrefab, int nextRoomX, int nextRoomY) {
         RoomData rd = potentialRoomPrefab.GetComponent<RoomData>();
-        //for each opening this potential room has, check the neighbor (if any) at that opening to make sure they can connect
-        //if all openings connect, return true, if not, return false and pick again
         //all of these will short circuit if the neighbor is out of bounds of the array
-        //TODO: have to change rooms to be array of RoomData, because that's all we care about? Change to GameObjects later if those are needed for like grammars?
-        if(rd.upOpening && (nextRoomY - 1 > 0) && rooms[nextRoomX, nextRoomY - 1]) {
-            //check that neighboring up room has down opening
-        } 
-        if(rd.leftOpening && (nextRoomX - 1 > 0) && rooms[nextRoomX - 1, nextRoomY]) {
-            //check that neighboring left room has right opening
+        //check up neighbor
+        if(rooms[nextRoomX, nextRoomY - 1]) {
+            Debug.Log("potential room has up neighbor");
+            RoomData upNeighborRD = rooms[nextRoomX, nextRoomY - 1].GetComponent<RoomData>();
+            if((rd.upOpening && !upNeighborRD.downOpening) || (upNeighborRD.downOpening && !rd.upOpening)) {
+                Debug.Log("potential room does not connect with up neighbor");
+                return false;
+            }
         }
-        if(rd.rightOpening && (nextRoomX + 1 < width - 1) && rooms[nextRoomX + 1, nextRoomY]) {
-            //check that neighboring right room has left opening
+        //check left neighbor
+        if(rooms[nextRoomX - 1, nextRoomY]) {
+            Debug.Log("potential room has left neighbor");
+            RoomData leftNeighborRD = rooms[nextRoomX - 1, nextRoomY].GetComponent<RoomData>();
+            if((rd.leftOpening && !leftNeighborRD.rightOpening) || (leftNeighborRD.rightOpening && !rd.leftOpening)) {
+                Debug.Log("potential room does not connect with left neighbor");
+                return false;
+            }
         }
-        if(rd.downOpening && (nextRoomY + 1 < height - 1) && rooms[nextRoomX, nextRoomY + 1]) {
-            //check that neighboring down room has up opening
+        //check right neighbor
+        if(rooms[nextRoomX + 1, nextRoomY]) {
+            Debug.Log("potential room right neighbor");
+            RoomData rightNeighborRD = rooms[nextRoomX + 1, nextRoomY].GetComponent<RoomData>();
+            if((rd.rightOpening && !rightNeighborRD.leftOpening) || (rightNeighborRD.leftOpening && !rd.rightOpening)) {
+                Debug.Log("potential room does not connect with right neighbor");
+                return false;
+            }
         }
-        return false;
+        //check down neighbor
+        if(rooms[nextRoomX, nextRoomY + 1]) {
+            Debug.Log("potential room has down neighbor");
+            RoomData downNeighborRD = rooms[nextRoomX, nextRoomY + 1].GetComponent<RoomData>();
+            if((rd.downOpening && !downNeighborRD.upOpening) || (downNeighborRD.upOpening && !rd.downOpening)) {
+                Debug.Log("potential room does not connect with down neighbor");
+                return false;
+            }
+        }
+        Debug.Log("potential room connects with all neighbors! pick it");
+        return true;
     }
 
     //places a new room in relation to the current room given a prefab, coordinates, and direction (dx, dy)
@@ -175,7 +191,6 @@ public class RoomGenerator : MonoBehaviour
     private GameObject placeRoom(GameObject nextRoomPrefab, GameObject currentRoom, int currentXPos, int currentYPos, int dx, int dy) {
         Debug.Log("Next room coordinate: (" + (currentXPos + dx) + ", " + (currentYPos + dy) + ")");
 
-        rooms[currentXPos + dx, currentYPos + dy] = true;
         //set up all needed data then instnatiate the room
         //TODO: more initializations need for instantiation?
         Vector3 nextRoomPos = currentRoom.transform.position;
@@ -189,6 +204,7 @@ public class RoomGenerator : MonoBehaviour
         GameObject instantiatedRoom = Instantiate(nextRoomPrefab, nextRoomPos, Quaternion.identity);
         //does the grammars! applies to the instantiated room, so we don't edit the prefab
         instantiatedRoom = applyGrammars(instantiatedRoom);
+        rooms[currentXPos + dx, currentYPos + dy] = instantiatedRoom;
 
         return instantiatedRoom;
     }
