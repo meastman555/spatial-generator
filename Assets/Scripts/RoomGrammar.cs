@@ -2,29 +2,69 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-//just a regular C# class, used to store data; does not interact with unity or game objects at all
-//for now english grammars and their game-space equivalents are defined here, not in editor
-//TODO: tweak and allow for editor-specified values all around (using dictionaries)
-//--> add static items for item rooms and enemies for enemy rooms (to illustrate that grammar works more than just color)
-public class RoomGrammar
+//There is almost certainly a more efficient way to do some of this, which I'll look into for my final!
+public class RoomGrammar : MonoBehaviour
 {
-    //TODO: something for room size (short, long, big, small, horizontal vs vertical, enormous, etc)
-    //something else? nested grammars?
-    public static Dictionary<string, int> roomSizeDict = new Dictionary<string, int>() 
-    {
-        { "test", 0 }
-    };
+    //dictionaries or structs are not editor serializable so use a small custom nested class to store relevant data
+    [System.Serializable]
+    public class RoomType {
+        public string name;
+        public Color color;
+        //TODO: make more general -- this *has* to be a multiple of 10 integer percentage out of 100 for now
+        public int chance;
+        public GameObject[] possiblePlacedObjects;
+    }
+    public RoomType[] roomTypes;
 
-    //a separate array for pulling a type from so that they can be weighted with how often each should appear
-    public static string[] roomTypes = new string[] { "normal", "normal", "enemy", "enemy", "enemy", "enemy", "enemy", "item", "item", "treasure"};
+    //TODO: other grammars?
 
-    //maps am english-grammar room type to a color
-    //TODO: for now just uses default Unity colors, add option for user to input their own types/colors in editor?
-    public static Dictionary<string, Color> roomTypeDict = new Dictionary<string, Color>() 
-    {
-        { "normal", Color.white },
-        { "enemy", Color.red },
-        { "treasure", Color.yellow },
-        { "item", Color.blue },
-    };
+    private ArrayList roomTypeNamesGrammar;
+
+    void Start() {
+        //creates the actual grammar by keeping a list of weighted strings corresponding to room types
+        roomTypeNamesGrammar = new ArrayList();
+        foreach(RoomType rt in roomTypes) {
+            //this only works because the chances are assumed to be integer numbers in multiples of 10 from 0 to 100
+            int chanceToInt = rt.chance / 10;
+            ArrayList tempList = ArrayList.Repeat(rt.name, chanceToInt);
+            roomTypeNamesGrammar.AddRange(tempList);
+        }
+    }
+
+    //does a weighted pick based on the chance percentage of the room type 
+    public string getNextRoomFromGrammar() {
+        int randIndex = Random.Range(0, roomTypeNamesGrammar.Count);
+        string roomTypeString = roomTypeNamesGrammar[randIndex].ToString();
+        return roomTypeString;
+    }
+
+    private RoomType getRoomType(string roomTypeName) {
+        foreach(RoomType rt in roomTypes) {
+            if(rt.name == roomTypeName) {
+                return rt;
+            }
+        }
+        //should never reach this, but makes compiler happy
+        return null;
+    }
+
+    public Color getRoomTypeColor(string roomTypeName) {
+        RoomType currentRT = getRoomType(roomTypeName);
+        Color currentRTColor = currentRT.color;
+        return currentRTColor;
+    } 
+
+    public bool canPlaceObject(string roomTypeName) {
+        RoomType currentRT = getRoomType(roomTypeName);
+        bool hasObjects = currentRT.possiblePlacedObjects.Length > 0;
+        return hasObjects;
+    }
+
+    //for now, just assumes a normal distribution of each object's chance
+    public GameObject pickObjectToPlaceInRoom(string roomTypeName) {
+        RoomType currentRT = getRoomType(roomTypeName);
+        int randIndex = Random.Range(0, currentRT.possiblePlacedObjects.Length);
+        GameObject chosenObject = currentRT.possiblePlacedObjects[randIndex];
+        return chosenObject;
+    }
 }

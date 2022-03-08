@@ -1,6 +1,0 @@
-Use Wang Tiles to generate a room layout (this statically works with prefabs, so now just do programatically through code)
-Once a tile has been picked based on its connectivity, use grammars to determine the style of room (long, short, square, rectangle, etc), and color!
-	This adds variety by having distinct generative locations (can also think of some other stuff to add if needed) and fulfills requirement of using two generative systems
-Wang Tile implementation notes are on my ipad and plenty of comments in RoomGenerator.cs
-
-Get to coding :)

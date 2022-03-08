@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 //simple data storage class that is attached to each room prefab
-//public bc it's just a couple of ints and I *promise* not to change them in the code
+//needs to be public so room generator class can easily access them (and I promise not to change values in the code :smile:)
 public class RoomData : MonoBehaviour
 {
     public int numOpenings;

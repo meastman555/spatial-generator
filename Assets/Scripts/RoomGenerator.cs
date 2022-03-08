@@ -31,9 +31,11 @@ public class RoomGenerator : MonoBehaviour
     [SerializeField] private GameObject downBranchEndRoom;
 
     private GameObject[,] rooms;
+    private RoomGrammar roomGrammar;
 
     void Start()
 	{
+        roomGrammar = GetComponent<RoomGrammar>();
         Debug.Log("starting generation");
         //some offsets here to account for the buffer around the actual grid (determines when a barrier room should be placed to stop branch)
         rooms = new GameObject[width + 2, height + 2];
@@ -126,6 +128,7 @@ public class RoomGenerator : MonoBehaviour
     }
 
     //picks a random room prefab based from the ones specified
+    //TODO: I think something is still hanging up here very rarely? Not sure what, but this is the only place in generation I use a while loop
     private GameObject pickRoom(GameObject[] listOfPossibleRooms, int currentXPos, int currentYPos, int dx, int dy) {
         //picks a room from possibilities!
         int roomIndex = Random.Range(0, listOfPossibleRooms.Length);
@@ -198,8 +201,7 @@ public class RoomGenerator : MonoBehaviour
     private GameObject placeRoom(GameObject nextRoomPrefab, GameObject currentRoom, int currentXPos, int currentYPos, int dx, int dy) {
         Debug.Log("Next room coordinate: (" + (currentXPos + dx) + ", " + (currentYPos + dy) + ")");
 
-        //set up all needed data then instnatiate the room
-        //TODO: more initializations need for instantiation?
+        //calculate position then instantiate!
         Vector3 nextRoomPos = currentRoom.transform.position;
         nextRoomPos.x += (xOffset * dx);
         //dy is negated because moving up in the rooms array (dy = -1) actually moves positively up in world space -- and vice-versa -- so flip
@@ -216,37 +218,52 @@ public class RoomGenerator : MonoBehaviour
         return instantiatedRoom;
     }
 
-    //applies the various grammars to this room and edits it as needed
-    //TODO: more grammar stuff! For now just assigns the room a color based on pulled type, but do more
+    //uses the grammar class to access the grammar and various properties, that get applied to the room here
+    //currently picks a type, gets the associated color, and picks one of the possible objects to place down
     private GameObject applyGrammars(GameObject instantiatedRoom) {
-        int typeIndex = Random.Range(0, RoomGrammar.roomTypes.Length);
-        string roomTypeName = RoomGrammar.roomTypes[typeIndex];
-        Color roomTypeColor = RoomGrammar.roomTypeDict[roomTypeName];
+        string roomTypeName = roomGrammar.getNextRoomFromGrammar();
+        Debug.Log("room type: " + roomTypeName);
+
+        Color roomTypeColor = roomGrammar.getRoomTypeColor(roomTypeName);
+        Debug.Log("room color: " + roomTypeColor.ToString());
         instantiatedRoom.GetComponent<SpriteRenderer>().color = roomTypeColor;
 
+        //make sure the room type has placeable objects before moving on
+        if(roomGrammar.canPlaceObject(roomTypeName)) {
+            GameObject objectToPlace = roomGrammar.pickObjectToPlaceInRoom(roomTypeName);
+            //simply places the object in the center of the room for now
+            Vector3 objectToPlacePos = instantiatedRoom.transform.position;
+            //make sure to set z correctly so they'll show up on top of rooms
+            objectToPlacePos.z = -1.0f;
+            GameObject placedObject = Instantiate(objectToPlace, objectToPlacePos, Quaternion.identity);
+            //childs the object to the room it's in
+            placedObject.transform.SetParent(instantiatedRoom.transform);
+        }
+       
         return instantiatedRoom;
     }
 
     //places an ending room (only one opening that complements current room exit) to stop this recursive branch of generation
     //TODO: the openings do not always line up with surrounding neighbors, because we don't check for fit (like in roomWouldConnect) -- refactor/use that method so that these can match all openings too
+    //also, remove the green color when done, that's just debug and overwrites the room type color
     private void placeEndingRoom(RoomData roomData, GameObject currentRoom, int currentXPos, int currentYPos) {
         //for now, manually check each opening like recursive cases
         //placeRoom returns a room, but since this is the ending room we don't need to keep track of it for anything else in generation and can discard
         if(roomData.upOpening && !rooms[currentXPos, currentYPos - 1]) {
             GameObject finalRoom = placeRoom(upBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, -1);
-            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
+            //finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.leftOpening && !rooms[currentXPos - 1, currentYPos]) {
             GameObject finalRoom = placeRoom(leftBranchEndRoom, currentRoom, currentXPos, currentYPos, -1, 0);
-            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
+            //finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.rightOpening && !rooms[currentXPos + 1, currentYPos]) {
             GameObject finalRoom = placeRoom(rightBranchEndRoom, currentRoom, currentXPos, currentYPos, 1, 0);
-            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
+            //finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
         if(roomData.downOpening && !rooms[currentXPos, currentYPos + 1]) {
             GameObject finalRoom = placeRoom(downBranchEndRoom, currentRoom, currentXPos, currentYPos, 0, 1);
-            finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
+            //finalRoom.GetComponent<SpriteRenderer>().color = Color.green;
         }
     }
 }
